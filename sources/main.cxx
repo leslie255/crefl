@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <optional>
+#include <vector>
 
 #include <clang-c/Index.h>
 #include <unordered_set>
@@ -172,25 +174,25 @@ static const std::string_view HEADER_MAIN_PROLOG =
 "/// Nullable!\n"
 "/// If `ptr` is null, then `size` must be 0.\n"
 "struct string_view_t {\n"
-"    const char* _Nullable ptr;\n"
-"    size_t size;\n"
+"    const char* ptr;\n"
+"    std::size_t size;\n"
 "};\n"
 "\n"
 "[[gnu::always_inline]]\n"
 "static inline bool operator==(string_view_t lhs, string_view_t rhs) {\n"
 "    if (lhs.size != rhs.size) return false;\n"
 "    if (lhs.size == 0 && rhs.size == 0) return true;\n"
-"    return memcmp(lhs.ptr, rhs.ptr, lhs.size) == 0;\n"
+"    return std::memcmp(lhs.ptr, rhs.ptr, lhs.size) == 0;\n"
 "}\n"
 "\n"
 "[[gnu::always_inline]]\n"
-"static inline constexpr string_view_t sv(nullptr_t) {\n"
+"static inline constexpr string_view_t sv(std::nullptr_t) {\n"
 "    return string_view_t {.ptr = nullptr, .size = 0};\n"
 "}\n"
 "\n"
 "[[gnu::always_inline]]\n"
 "static inline string_view_t sv(const char* cstr) {\n"
-"    return string_view_t {.ptr = cstr, .size = strlen(cstr)};\n"
+"    return string_view_t {.ptr = cstr, .size = std::strlen(cstr)};\n"
 "}\n"
 "\n"
 "/// If no enum of type `typename_` is known, returns a `string_view_t` with `.ptr = nullptr`\n"

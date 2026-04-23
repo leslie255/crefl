@@ -164,7 +164,7 @@ void scan_file(ProgramState& state) {
 static const std::string_view HEADER_INCLUDES_PROLOG =
 "#include <cstddef>\n"
 "#include <cstdint>\n"
-"#include <cstdint>\n"
+"#include <cstring>\n"
 "\n"
 ;
 

@@ -12,9 +12,13 @@
 
 struct ProgramArgs {
     std::string input_path;
-    std::optional<std::string> output_header;
-    std::optional<std::string> output_source;
-    std::optional<std::string> namespace_;
+    std::string prolog_hpp = {};
+    std::string epilog_hpp = {};
+    std::string prolog_cpp = {};
+    std::string epilog_cpp = {};
+    std::optional<std::string> output_header = std::nullopt;
+    std::optional<std::string> output_source = std::nullopt;
+    std::optional<std::string> namespace_ = std::nullopt;
 };
 
 struct EnumConstant {
@@ -214,15 +218,20 @@ static const std::string_view HEADER_EPILOG = "\n";
 static const std::string_view HELP_TEXT =
 "Usage: crefle [options] <input_path>\n"
 "Options:\n"
-"\t--hpp       : Header file (.hpp/.hxx) output path\n"
-"\t--cpp       : Source file (.cpp/.cxx) output path (requires `--hpp` to be present)\n"
-"\t--namespace : Namespace of generated reflection code (leave empty for no namespace)\n"
+"\t-h,--help    : Print this prompt\n"
+"\t--hpp        : Header file (.hpp/.hxx) output path\n"
+"\t--cpp        : Source file (.cpp/.cxx) output path (requires `--hpp` to be present)\n"
+"\t--namespace  : Namespace of generated reflection code (leave empty for no namespace)\n"
+"\t--prolog-hpp : Text to append before everything else in the generated header file\n"
+"\t--epilog-hpp : Text to append after everything else in the generated header file\n"
+"\t--prolog-cpp : Text to append before everything else in the generated source file\n"
+"\t--epilog-cpp : Text to append after everything else in the generated source file\n"
 ;
 // clang-format on
 
 template <FormattableType... Args>
 static inline void fail(std::format_string<Args...> fmt, Args&&... xs) {
-    eprint("Error: {}", std::format(fmt, std::forward<Args>(xs)...));
+    eprintln("Error: {}", std::format(fmt, std::forward<Args>(xs)...));
     eprintln("{}", HELP_TEXT);
     std::exit(1);
 }
@@ -241,16 +250,20 @@ ProgramArgs parse_argv(int32_t argc_, const char** argv) {
             return argv[++i];
         };
 
-        if (arg == "--hpp") {
-            args.output_header = std::string(require_value(arg));
-        } else if (arg == "--cpp") {
-            args.output_source = std::string(require_value(arg));
-        } else if (arg == "--namespace") {
-            args.namespace_ = std::string(require_value(arg));
-        } else if (arg == "--help" || arg == "-h") {
+        if (arg == "--help" || arg == "-h") {
             eprintln("{}", HELP_TEXT);
             std::exit(0);
-        } else if (!arg.starts_with("--")) {
+        }
+        // clang-format off
+        if (arg == "--hpp")             args.output_header = std::string(require_value(arg));
+        else if (arg == "--cpp")        args.output_source = std::string(require_value(arg));
+        else if (arg == "--namespace")  args.namespace_ = std::string(require_value(arg));
+        else if (arg == "--prolog-hpp") args.prolog_hpp = std::string(require_value(arg));
+        else if (arg == "--epilog-hpp") args.epilog_hpp = std::string(require_value(arg));
+        else if (arg == "--prolog-cpp") args.prolog_cpp = std::string(require_value(arg));
+        else if (arg == "--epilog-cpp") args.epilog_cpp = std::string(require_value(arg));
+        // clang-format on
+        else if (!arg.starts_with("--")) {
             if (input_set) {
                 fail("Multiple input paths provided (only one allowed)");
             }
@@ -284,6 +297,7 @@ void generate_hpp(const ProgramState& state) {
     auto out_path = state.program_args->output_header.value();
     auto out = std::ofstream(out_path, std::ios::out | std::ios::trunc);
 
+    println_to(out, "{}", state.program_args->prolog_hpp);
     print_to(out, "{}", HEADER_INCLUDES_PROLOG);
 
     if (state.program_args->namespace_.has_value())
@@ -299,6 +313,8 @@ void generate_hpp(const ProgramState& state) {
 
     if (state.program_args->namespace_.has_value())
         println_to(out, "}} // namespace {}\n", state.program_args->namespace_.value());
+
+    println_to(out, "{}", state.program_args->epilog_hpp);
 }
 
 std::string relative_subpath(std::string_view path0, std::string_view path1) {
@@ -315,9 +331,10 @@ void generate_cpp(const ProgramState& state) {
     auto out_path = state.program_args->output_source.value();
     auto out = std::ofstream(out_path, std::ios::out | std::ios::trunc);
 
+    println_to(out, "{}", state.program_args->prolog_cpp);
     println_to(
         out,
-        "// clang-format off\n#include \"{}\"\n",
+        "#include \"{}\"\n",
         relative_subpath(
             state.program_args->output_source.value(),
             state.program_args->output_header.value()));
@@ -366,6 +383,8 @@ void generate_cpp(const ProgramState& state) {
 
     if (state.program_args->namespace_.has_value())
         println_to(out, "}} // namespace {}\n", state.program_args->namespace_.value());
+
+    println_to(out, "{}", state.program_args->epilog_cpp);
 }
 
 int32_t main(int32_t argc, const char** argv) {
